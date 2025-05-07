@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: read
+    env:
+      READ_PACKAGES_TOKEN: ${{ secrets.READ_PACKAGES_TOKEN }}
 
     steps:
       - name: Git checkout
@@ -155,8 +157,6 @@ jobs:
       - name: Install dependencies
         working-directory: ./src
         run: dotnet restore
-        env:
-          READ_PACKAGES_TOKEN: ${{ secrets.READ_PACKAGES_TOKEN }}
       - name: Build
         working-directory: ./src
         run: |
