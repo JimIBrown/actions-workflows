@@ -1,24 +1,10 @@
-name: test-build
+name: package-nuget
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-      - feature/*
-      - release/*
-      - support/*
-      - hotfix/*
-    paths:
-     - src/**
-     - build/**
-     - .github/workflows/build-test.yml
-  pull_request:
-  workflow_dispatch:
+    workflow_call:
   
 jobs:
-  actions-test:
-    name: actions test
+  build-package-nuget:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
