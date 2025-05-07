@@ -152,11 +152,15 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.x
+
+      - name: 'NuGet: Configure sources'
+        run: |
+          dotnet nuget add source -n github -u JimIBrown -p ${{ secrets.READ_PACKAGES_TOKEN }} --store-password-in-clear-text "https://nuget.pkg.github.com/JimIBrown/index.json"
+      
       - name: Install dependencies
         working-directory: ./src
         run: dotnet restore
-        env:
-          GITHUB_TOKEN: ${{ secrets.READ_PACKAGES_TOKEN }}
+
       - name: Build
         working-directory: ./src
         run: |
