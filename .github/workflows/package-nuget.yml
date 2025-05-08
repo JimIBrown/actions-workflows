@@ -4,8 +4,6 @@ on:
     workflow_call:
   
 jobs:
-  call-workflow:
-    uses: JimIBrown/actions-workflows/.github/workflows/versioning.yml@main
   build-package-nuget:
     runs-on: ubuntu-latest
     permissions:
