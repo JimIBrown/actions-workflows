@@ -1,0 +1,155 @@
+name: versioning
+
+on:
+    workflow_call:
+  
+jobs:
+  build-package-nuget:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v2
+      - name: set variables
+        run: |
+          shortSha=$(git rev-parse --short ${{ github.sha }})
+          echo "SHORT_SHA=$shortSha" >> $GITHUB_ENV
+    
+      - name: versioning
+        shell: pwsh
+        run: |
+
+          #Get settings file
+          $timestamp = Get-Date -Format o | ForEach-Object { $_ -replace ":", "." }
+          $settingsfile = get-childitem -Filter 'settings.json' -Recurse -File | Select-Object -First 1 | %{$_.FullName}
+          $json = (Get-Content $settingsfile -Raw) | ConvertFrom-Json
+
+          $short_hash = $env:SHORT_SHA
+          $hash = $env:GITHUB_WORKFLOW_SHA
+          $branchFull = $env:GITHUB_REF
+          $branch = $env:GITHUB_REF_NAME
+          $buildId = $env:GITHUB_RUN_NUMBER
+          $repo = $env:GITHUB_REPOSITORY
+          $repoOwner = $env:GITHUB_REPOSITORY_OWNER
+          $buildReason = $env:GITHUB_EVENT_NAME
+
+          Write-Host "Timestamp: $timestamp"
+          Write-Host "BranchFull: $branchFull"
+          Write-Host "Branch: $branch"
+          Write-Host "Build ID: $buildId"
+          Write-Host "SHA: $hash"
+          Write-Host "Short SHA: $short_hash"
+          Write-Host "Build Reason: $buildReason"
+          Write-Host "Repo: $repo"
+          Write-Host "Repo Owner: $repoOwner"
+        
+          $includeSuffixInPackageVersion = $true
+
+          #Determine version suffix detail
+          if ($buildReason -eq 'pull_request') {
+              write-host "Source Branch: pull request"
+              $includeSuffixInPackageVersion = $false
+              $suffix = '' + $buildId + '-' + $short_hash
+              $build_config = 'Release'
+          } elseif ($branch -eq 'main') {
+              write-host "Source Branch: main"
+              $includeSuffixInPackageVersion = $false
+              $suffix = '' + $buildId + '-' + $short_hash
+              $build_config = 'Release'
+          } elseif ($branch -eq 'develop') {
+              write-host "Source Branch: develop"
+              $suffix = 'beta-' + $buildId + '-' + $short_hash
+              $build_config = 'Release'
+          } elseif ($branch.StartsWith('feature/')) {
+              write-host "Source Branch: feature"
+              $branch_name = $branch.replace('feature/','')
+              $suffix = 'alpha-' + $buildId + '-' + $branch_name + '-' + $short_hash
+              $build_config = 'Debug'
+          } elseif ($branch.StartsWith('hotfix/')) {
+              write-host "Source Branch: hotfix"
+              $suffix = 'hotfix-' + $buildId + '-' + $short_hash
+              $build_config = 'Release'
+          } elseif ($branch.StartsWith('release/')) {
+              write-host "Source Branch: release"
+              $suffix = 'rc-' + $buildId + '-' + $short_hash
+              $build_config = 'Release'
+          } elseif ($branch.StartsWith('support/')) {
+              write-host "Source Branch: support"
+              $includeSuffixInPackageVersion = $false
+              $suffix = '' + $buildId + '-' + $short_hash
+              $build_config = 'Release'
+          } else {
+              throw "Unrecognised Branch: " + $branch
+          }
+
+          # Throw an error if a build suffix has not been set but should have been
+          if($buildReason -ne 'pull_request' -and -not ($branch -eq 'main' -or $branch.StartsWith('support/')) -and $suffix -eq '')
+          {
+              throw 'The branch is not a pull request, support branch or the main branch but a package suffix has not been set'
+          }
+
+          $version = $json.Version + '-' + $suffix
+          
+          $packageVersion = $version
+
+          if (!$includeSuffixInPackageVersion)
+          {
+            $packageVersion = $json.Version
+          }
+
+          #Update csproj version
+          write-host ""        
+          write-host "version: " $version
+          write-host "packageVersion: " $packageVersion
+          write-host "Build Config: " $build_config
+
+          $versionPattern = '<Version>.*</Version>'
+          $prefixPattern = '<VersionPrefix>.*</VersionPrefix>'
+          $suffixPattern = '<VersionSuffix>.*</VersionSuffix>'
+          $packageVersionPattern = '<PackageVersion>.*</PackageVersion>'
+          $newPrefix = '<VersionPrefix>' + $json.Version +'</VersionPrefix>'
+          $newSuffix = '<VersionSuffix>' + $suffix +'</VersionSuffix>'
+          $newPackageVersion = '<PackageVersion>' + $packageVersion +'</PackageVersion>'
+          
+          $errorMessage = ''
+          $files = get-childitem -Filter '*.csproj' -Recurse -File | Select-Object
+          foreach ($file in $files) 
+          {
+              write-host "Updating Version: " $file.FullName
+              
+              $matches = select-string -path $file.FullName -Pattern $versionPattern
+              if ($matches -ne $null) {
+                  $errorMessage +=  "Please use VersionPrefix and VersionSuffix instead of Version in :" + $file.FullName + "`n"
+              }
+              $matches = select-string -path $file.FullName -Pattern $prefixPattern
+              if ($matches -eq $null) {
+                  $errorMessage +=  "Could not locate VersionPrefix in :" + $file.FullName + "`n"
+              }
+              $matches = select-string -path $file.FullName -Pattern $suffixPattern
+              if ($matches -eq $null) {
+                  $errorMessage +=  "Could not locate VersionSuffix in :" + $file.FullName + "`n"
+              }
+              $matches = select-string -path $file.FullName -Pattern $packageVersionPattern
+              if ($matches -eq $null) {
+                  $errorMessage +=  "Could not locate PackageVersion in :" + $file.FullName + "`n"
+              }
+              #Update Prefix
+              (Get-Content $file.FullName) | % ` { $_-replace $prefixPattern, $newPrefix } |  Set-Content $file.FullName
+              #Update Suffix
+              (Get-Content $file.FullName) | % ` { $_-replace $suffixPattern, $newSuffix } |  Set-Content $file.FullName
+              #Update PackageVersion
+              (Get-Content $file.FullName) | % ` { $_-replace $packageVersionPattern, $newPackageVersion } |  Set-Content $file.FullName
+          }
+
+          if ($errorMessage.length) 
+          {
+            $errorMessage =  "Unable to apply versioning, please fix the following errors:`n" + $errorMessage
+            throw $errorMessage
+          }
+
+          # Write variables
+          echo "BuildConfiguration=$build_config" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
