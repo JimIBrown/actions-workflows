@@ -4,8 +4,7 @@ on:
     workflow_call:
   
 jobs:
-  call-workflow:
-    uses: JimIBrown/actions-workflows/.github/workflows/versioning.yml@main
+
   build-package-nuget:
     runs-on: ubuntu-latest
     permissions:
@@ -14,8 +13,8 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     steps:
-      - name: Git checkout
-        uses: actions/checkout@v2
+      - name: versioning
+        uses: JimIBrown/actions-workflows/.github/workflows/versioning.yml@main
       - name: Setup dotnet
         uses: actions/setup-dotnet@v4
         with:
