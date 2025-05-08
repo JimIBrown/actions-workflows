@@ -156,9 +156,9 @@ jobs:
         with:
           dotnet-version: 8.x
 
-    #   - name: NuGet Configure sources
-    #     run: |
-    #       dotnet nuget add source --username JimIBrown --password  --store-password-in-clear-text --name github "https://nuget.pkg.github.com/JimIBrown/index.json"
+      - name: NuGet Configure sources
+        run: |
+          dotnet nuget add source --username JimIBrown --password ${{ secrets.READ_PACKAGES_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/JimIBrown/index.json"
       
       - name: Install dependencies
         working-directory: ./src
