@@ -184,3 +184,11 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         working-directory: ./src
         run: dotnet nuget push pkg/*.nupkg --source https://nuget.pkg.github.com/${{ github.REPOSITORY_OWNER}}/index.json --api-key ${GITHUB_TOKEN}
+
+      - name: Publish-Artifact
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: ./src/pkg/*.nupkg
+            
