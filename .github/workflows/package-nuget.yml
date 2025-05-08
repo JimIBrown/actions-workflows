@@ -10,7 +10,6 @@ jobs:
       packages: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      READ_PACKAGES_TOKEN: ${{ vars.READ_PACKAGES_TOKEN }}
 
     steps:
       - name: Git checkout
@@ -158,7 +157,7 @@ jobs:
 
       - name: NuGet Configure sources
         run: |
-          dotnet nuget add source --username JimIBrown --password ${{ vars.READ_PACKAGES_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/JimIBrown/index.json"
+          dotnet nuget add source --username JimIBrown --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/JimIBrown/index.json"
       
       - name: Install dependencies
         working-directory: ./src
