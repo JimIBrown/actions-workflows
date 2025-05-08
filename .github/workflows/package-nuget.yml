@@ -7,7 +7,9 @@ jobs:
   build-package-nuget:
     runs-on: ubuntu-latest
     permissions:
-      packages: read
+      packages: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Git checkout
@@ -153,9 +155,9 @@ jobs:
         with:
           dotnet-version: 8.x
 
-      - name: 'NuGet: Configure sources'
-        run: |
-          dotnet nuget add source -n github -u JimIBrown -p ${{ secrets.READ_PACKAGES_TOKEN }} --store-password-in-clear-text "https://nuget.pkg.github.com/JimIBrown/index.json"
+    #   - name: NuGet Configure sources
+    #     run: |
+    #       dotnet nuget add source --username JimIBrown --password  --store-password-in-clear-text --name github "https://nuget.pkg.github.com/JimIBrown/index.json"
       
       - name: Install dependencies
         working-directory: ./src
@@ -179,5 +181,3 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         working-directory: ./src
         run: dotnet nuget push pkg/*.nupkg --source https://nuget.pkg.github.com/JimIBrown/index.json --api-key ${GITHUB_TOKEN}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
