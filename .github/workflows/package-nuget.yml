@@ -4,7 +4,8 @@ on:
     workflow_call:
   
 jobs:
-
+  call-workflow:
+    uses: JimIBrown/actions-workflows/.github/workflows/versioning.yml@main
   build-package-nuget:
     runs-on: ubuntu-latest
     permissions:
@@ -13,8 +14,11 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     steps:
-      - name: versioning
-        uses: JimIBrown/actions-workflows/.github/workflows/versioning.yml@main
+      - name: Git checkout
+        uses: actions/checkout@v2
+      - id: versioning
+        uses: ./.github/actions/versioning
+
       - name: Setup dotnet
         uses: actions/setup-dotnet@v4
         with:
@@ -33,6 +37,8 @@ jobs:
         run: |
             echo "BuildConfiguration: $BuildConfiguration"
             dotnet build --configuration $BuildConfiguration --no-restore
+        env:
+          BuildConfiguration: ${{ steps.versioning.outputs.BuildConfiguration }}
       - name: Test with the dotnet CLI
         working-directory: ./src
         run: dotnet test --no-build
@@ -41,6 +47,8 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         working-directory: ./src
         run: dotnet pack **/*.csproj --configuration $BuildConfiguration --no-build --output ./pkg/
+        env:
+          BuildConfiguration: ${{ steps.versioning.outputs.BuildConfiguration }}
 
       - name: Push
         if: ${{ github.event_name != 'pull_request' }}
