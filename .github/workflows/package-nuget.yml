@@ -34,6 +34,7 @@ jobs:
           $branch = $env:GITHUB_REF_NAME
           $buildId = $env:GITHUB_RUN_NUMBER
           $repoName = $env:BUILD_REPOSITORY_NAME
+          $repoOwner = $env:GITHUB_REPOSITORY_OWNER
           $buildReason = $env:GITHUB_EVENT_NAME
 
           Write-Host "Timestamp: $timestamp"
@@ -43,6 +44,8 @@ jobs:
           Write-Host "SHA: $hash"
           Write-Host "Short SHA: $short_hash"
           Write-Host "Build Reason: $buildReason"
+          Write-Host "Repo Name: $repoName"
+          Write-Host "Repo Owner: $repoOwner"
         
           $includeSuffixInPackageVersion = $true
 
@@ -180,4 +183,4 @@ jobs:
       - name: Push
         if: ${{ github.event_name != 'pull_request' }}
         working-directory: ./src
-        run: dotnet nuget push pkg/*.nupkg --source https://nuget.pkg.github.com/JimIBrown/index.json --api-key ${GITHUB_TOKEN}
+        run: dotnet nuget push pkg/*.nupkg --source https://nuget.pkg.github.com/ ${{ github.REPOSITORY_OWNER}} /index.json --api-key ${GITHUB_TOKEN}
