@@ -1,4 +1,4 @@
-name: package-nuget
+name: docker-image
 
 on:
     workflow_call:
@@ -234,10 +234,11 @@ jobs:
               $jsonBase.Add("docker-latest-tag", $env.dockerLatestTag)
           }
 
-          $versionFile = $env.publishDir + '/Version.json'
+          $versionFile = $env:GITHUB_WORKSPACE + '/publish/Version.json'
 
-          echo "publishDir: $env.publishDir"
           echo "VersionFile: $versionFile"
+
+          $jsonBase | ConvertTo-Json
 
           $jsonBase | ConvertTo-Json | Out-File $versionFile
 
