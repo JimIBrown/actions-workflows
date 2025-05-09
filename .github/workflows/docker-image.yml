@@ -10,7 +10,7 @@ on:
               required: true
               type: string
 jobs:
-  build-package-nuget:
+  build-docker-image:
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -234,7 +234,10 @@ jobs:
           $jsonBase | ConvertTo-Json
           $jsonBase | ConvertTo-Json | Out-File $versionFile
 
-        # Docker Build and Push
+      - name: Docker Build and Push
+        if: ${{ env.BuildDockerImage }}
+        run: |
+          echo "Replace this step with docker build and push"
 
       - name: Publish-Artifact
         if: ${{ github.event_name != 'pull_request' }}
