@@ -2,7 +2,13 @@ name: package-nuget
 
 on:
     workflow_call:
-
+        inputs:
+            dockerRepo:
+              required: true
+              type: string
+            projectName:
+              required: true
+              type: string
 jobs:
   build-package-nuget:
     runs-on: ubuntu-latest
@@ -18,6 +24,8 @@ jobs:
         run: |
           shortSha=$(git rev-parse --short ${{ github.sha }})
           echo "SHORT_SHA=$shortSha" >> $GITHUB_ENV
+          echo "dockerRepo=${{ inputs.dockerRepo }}" >> $GITHUB_ENV
+          echo "projectName=${{ inputs.projectName }}" >> $GITHUB_ENV
     
       - name: versioning
         shell: pwsh
@@ -28,6 +36,8 @@ jobs:
           $settingsfile = get-childitem -Filter 'settings.json' -Recurse -File | Select-Object -First 1 | %{$_.FullName}
           $json = (Get-Content $settingsfile -Raw) | ConvertFrom-Json
 
+          $dockerRepo = $env:dockerRepo
+          $projectName = $env:projectName
           $short_hash = $env:SHORT_SHA
           $hash = $env:GITHUB_WORKFLOW_SHA
           $branchFull = $env:GITHUB_REF
@@ -36,6 +46,7 @@ jobs:
           $repo = $env:GITHUB_REPOSITORY
           $repoOwner = $env:GITHUB_REPOSITORY_OWNER
           $buildReason = $env:GITHUB_EVENT_NAME
+          $workspaceDir = $env:GITHUB_WORKSPACE
 
           Write-Host "Timestamp: $timestamp"
           Write-Host "BranchFull: $branchFull"
@@ -46,80 +57,94 @@ jobs:
           Write-Host "Build Reason: $buildReason"
           Write-Host "Repo: $repo"
           Write-Host "Repo Owner: $repoOwner"
+          Write-Host "Docker Repo: $dockerRepo"
+          Write-Host "Project Name: $projectName"
+          Write-Host "Workspace Dir: $workspaceDir"
         
-          $includeSuffixInPackageVersion = $true
+          $buildDockerImage = "true"
+          $dockerTag = ""
+          $dockerLatestTag = ""
 
-          #Determine version suffix detail
           if ($buildReason -eq 'pull_request') {
               write-host "Source Branch: pull request"
-              $includeSuffixInPackageVersion = $false
-              $suffix = '' + $buildId + '-' + $short_hash
+              $versionSuffix = ""
+              $branchType = 'pr'
               $build_config = 'Release'
+              $buildDockerImage = "false"
           } elseif ($branch -eq 'main') {
               write-host "Source Branch: main"
-              $includeSuffixInPackageVersion = $false
-              $suffix = '' + $buildId + '-' + $short_hash
+              $versionSuffix = ""
+              $branchType = 'main'
               $build_config = 'Release'
+              $dockerTag = "prod-" + $buildId
+              $dockerLatestTag = "prod-latest"
           } elseif ($branch -eq 'develop') {
               write-host "Source Branch: develop"
-              $suffix = 'beta-' + $buildId + '-' + $short_hash
+              $versionSuffix = "beta"
+              $branchType = 'develop'
               $build_config = 'Release'
+              $dockerTag = "dev-" + $buildId
+              $dockerLatestTag = "dev-latest"
           } elseif ($branch.StartsWith('feature/')) {
               write-host "Source Branch: feature"
-              $branch_name = $branch.replace('feature/','')
-              $suffix = 'alpha-' + $buildId + '-' + $branch_name + '-' + $short_hash
+              $versionSuffix = "alpha-" + $branch_name
+              $branchType = 'feature-' + $branch_name
               $build_config = 'Debug'
+              $buildDockerImage = "false"
           } elseif ($branch.StartsWith('hotfix/')) {
-              write-host "Source Branch: hotfix"
-              $suffix = 'hotfix-' + $buildId + '-' + $short_hash
+            write-host "Source Branch: hotfix"
+              $versionSuffix = "hotfix"
+              $branchType = 'hotfix-' + $branch_name
               $build_config = 'Release'
+              $dockerTag = "release-" + $buildId
+              $dockerLatestTag = "release-latest"
           } elseif ($branch.StartsWith('release/')) {
               write-host "Source Branch: release"
-              $suffix = 'rc-' + $buildId + '-' + $short_hash
+              $versionSuffix = "rc"
+              $branchType = 'release-' + $branch_name
               $build_config = 'Release'
+              $dockerTag = "release-" + $buildId
+              $dockerLatestTag = "release-latest"
           } elseif ($branch.StartsWith('support/')) {
               write-host "Source Branch: support"
-              $includeSuffixInPackageVersion = $false
-              $suffix = '' + $buildId + '-' + $short_hash
+              $versionSuffix = ""
+              $branchType = 'support-' + $branch_name
               $build_config = 'Release'
+              $dockerTag = "prod-" + $buildId
+              $dockerLatestTag = "prod-latest"
           } else {
               throw "Unrecognised Branch: " + $branch
           }
 
-          # Throw an error if a build suffix has not been set but should have been
-          if($buildReason -ne 'pull_request' -and -not ($branch -eq 'main' -or $branch.StartsWith('support/')) -and $suffix -eq '')
-          {
-              throw 'The branch is not a pull request, support branch or the main branch but a package suffix has not been set'
-          }
-
-          $version = $json.Version + '-' + $suffix
+          $fullVersionSuffix = $short_hash
           
-          $packageVersion = $version
-
-          if (!$includeSuffixInPackageVersion)
-          {
-            $packageVersion = $json.Version
+          if ($versionSuffix.Length -gt 0) {
+              $fullVersionSuffix = $versionSuffix + '-' + $short_hash
           }
+
+          $assemblyVersion = 'AssemblyVersion("' + $json.Version + '")'
+          $assemblyFileVersion = 'AssemblyFileVersion("' + $json.Version + '")'
+          $version = $json.Version + '-' + $fullVersionSuffix
+          $assemblyInformationalVersion = 'AssemblyInformationalVersion("' + $version + '")'
+          write-host $assemblyVersion
+          write-host $assemblyFileVersion
+          write-host $assemblyInformationalVersion
+          write-host "Config:  $build_config"
+          write-host "buildDockerImage:  $buildDockerImage"
+          write-host "dockerRepo:  $dockerRepo"
+          write-host "dockerTag:  $dockerTag"
+          write-host "dockerLatestTag:  $dockerLatestTag"
 
           #Update csproj version
-          write-host ""        
-          write-host "version: " $version
-          write-host "packageVersion: " $packageVersion
-          write-host "Build Config: " $build_config
-
           $versionPattern = '<Version>.*</Version>'
           $prefixPattern = '<VersionPrefix>.*</VersionPrefix>'
           $suffixPattern = '<VersionSuffix>.*</VersionSuffix>'
-          $packageVersionPattern = '<PackageVersion>.*</PackageVersion>'
-          $newPrefix = '<VersionPrefix>' + $json.Version +'</VersionPrefix>'
-          $newSuffix = '<VersionSuffix>' + $suffix +'</VersionSuffix>'
-          $newPackageVersion = '<PackageVersion>' + $packageVersion +'</PackageVersion>'
-          
-          $errorMessage = ''
+          $newPrefix = '<VersionPrefix>' + $json.Version + '</VersionPrefix>'
+          $newSuffix = '<VersionSuffix>' + $fullVersionSuffix + '</VersionSuffix>'
           $files = get-childitem -Filter '*.csproj' -Recurse -File | Select-Object
-          foreach ($file in $files) 
-          {
-              write-host "Updating Version: " $file.FullName
+          $errorMessage = ''
+          foreach ($file in $files) {
+              Write-Host "Updating Version: " $file.FullName
               
               $matches = select-string -path $file.FullName -Pattern $versionPattern
               if ($matches -ne $null) {
@@ -133,26 +158,42 @@ jobs:
               if ($matches -eq $null) {
                   $errorMessage +=  "Could not locate VersionSuffix in :" + $file.FullName + "`n"
               }
-              $matches = select-string -path $file.FullName -Pattern $packageVersionPattern
-              if ($matches -eq $null) {
-                  $errorMessage +=  "Could not locate PackageVersion in :" + $file.FullName + "`n"
-              }
               #Update Prefix
               (Get-Content $file.FullName) | % ` { $_-replace $prefixPattern, $newPrefix } |  Set-Content $file.FullName
               #Update Suffix
               (Get-Content $file.FullName) | % ` { $_-replace $suffixPattern, $newSuffix } |  Set-Content $file.FullName
-              #Update PackageVersion
-              (Get-Content $file.FullName) | % ` { $_-replace $packageVersionPattern, $newPackageVersion } |  Set-Content $file.FullName
           }
 
-          if ($errorMessage.length) 
-          {
-            $errorMessage =  "Unable to apply versioning, please fix the following errors:`n" + $errorMessage
-            throw $errorMessage
+          #Write Version File
+
+          $jsonBase = @{}
+          $jsonBase.Add("build-id", $buildId)
+          $jsonBase.Add("version", $version)
+          $jsonBase.Add("version-number", $json.Version)
+          $jsonBase.Add("version-suffix", $versionSuffix)
+          $jsonBase.Add("repo-name", $repoName)
+          $jsonBase.Add("commit-hash", $hash)
+          $jsonBase.Add("short-hash", $short_hash)
+          $jsonBase.Add("branch", $branch)
+          $jsonBase.Add("branch-name", $branch_name)
+          $jsonBase.Add("branch-type", $branchType)
+          $jsonBase.Add("build-config", $build_config)
+          $jsonBase.Add("build-timestamp",$timestamp)
+
+          if ($buildDockerImage -eq "true") {
+              $jsonBase.Add("docker-repo", $dockerRepo)
+              $jsonBase.Add("docker-tag", $dockerTag)
+              $jsonBase.Add("docker-latest-tag", $dockerLatestTag)
           }
+
+          $versionFile = $workspaceDir + '/Version.json'
+          $jsonBase | ConvertTo-Json | Out-File $versionFile
 
           # Write variables
           echo "BuildConfiguration=$build_config" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          echo "BuildDockerImage=$buildDockerImage" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          echo "DockerTag=$dockerTag" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          echo "DockerLatestTag=$dockerLatestTag" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Setup dotnet
         uses: actions/setup-dotnet@v4
@@ -177,20 +218,16 @@ jobs:
         working-directory: ./src
         run: dotnet test --no-build
 
-      - name: Pack
-        if: ${{ github.event_name != 'pull_request' }}
+      - name: Publish
         working-directory: ./src
-        run: dotnet pack **/*.csproj --configuration $BuildConfiguration --no-build --output ./pkg/
+        run: dotnet publish **/$projectName.csproj --configuration $BuildConfiguration -p:PublishDir=$workflowDir/publish --self-contained false --no-restore
 
-      - name: Push
-        if: ${{ github.event_name != 'pull_request' }}
-        working-directory: ./src
-        run: dotnet nuget push pkg/*.nupkg --source https://nuget.pkg.github.com/${{ github.REPOSITORY_OWNER}}/index.json --api-key ${GITHUB_TOKEN}
+        # Docker Build and Push
 
       - name: Publish-Artifact
         if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v4
         with:
           name: package
-          path: ./src/pkg/*.nupkg
+          path: $workflowDir/publish
             
