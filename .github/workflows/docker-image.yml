@@ -36,9 +36,6 @@ jobs:
           $settingsfile = get-childitem -Filter 'settings.json' -Recurse -File | Select-Object -First 1 | %{$_.FullName}
           $json = (Get-Content $settingsfile -Raw) | ConvertFrom-Json
 
-          $publishDir = $workspaceDir + '/publish'
-          New-Item -Path $workspaceDir -Name "publish" -ItemType "Directory"
-
           $dockerRepo = $env:dockerRepo
           $projectName = $env:projectName
           $short_hash = $env:SHORT_SHA
@@ -50,6 +47,9 @@ jobs:
           $repoOwner = $env:GITHUB_REPOSITORY_OWNER
           $buildReason = $env:GITHUB_EVENT_NAME
           $workspaceDir = $env:GITHUB_WORKSPACE
+          
+          $publishDir = $workspaceDir + '/publish'
+          New-Item -Path $workspaceDir -Name "publish" -ItemType "Directory"
 
           Write-Host "Timestamp: $timestamp"
           Write-Host "BranchFull: $branchFull"
@@ -63,7 +63,7 @@ jobs:
           Write-Host "Docker Repo: $dockerRepo"
           Write-Host "Project Name: $projectName"
           Write-Host "Workspace Dir: $workspaceDir"
-          Write-Host "Workspace Dir: $publishDir"
+          Write-Host "Publish Dir: $publishDir"
         
           $buildDockerImage = "true"
           $dockerTag = ""
