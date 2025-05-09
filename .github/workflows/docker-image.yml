@@ -236,8 +236,9 @@ jobs:
 
           $versionFile = $env.publishDir + '/Version.json'
 
+          echo "publishDir: $env.publishDir"
           echo "VersionFile: $versionFile"
-          
+
           $jsonBase | ConvertTo-Json | Out-File $versionFile
 
         # Docker Build and Push
