@@ -220,7 +220,7 @@ jobs:
 
       - name: Publish
         working-directory: ./src
-        run: dotnet publish **/$projectName.csproj --configuration $BuildConfiguration -p:PublishDir=$workflowDir/publish --self-contained false --no-restore
+        run: dotnet publish **/$projectName.csproj --configuration $BuildConfiguration -p:PublishDir=./publish --self-contained false --no-restore
 
         # Docker Build and Push
 
