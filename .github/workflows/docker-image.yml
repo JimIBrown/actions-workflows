@@ -186,6 +186,9 @@ jobs:
               $jsonBase.Add("docker-latest-tag", $dockerLatestTag)
           }
 
+          $publishDir = $workspaceDir + '/publish'
+          New-Item -Path $workspaceDir -Name "publish" -ItemType "Directory"
+
           $versionFile = $workspaceDir + '/Version.json'
           $jsonBase | ConvertTo-Json | Out-File $versionFile
 
@@ -194,6 +197,7 @@ jobs:
           echo "BuildDockerImage=$buildDockerImage" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "DockerTag=$dockerTag" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "DockerLatestTag=$dockerLatestTag" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          echo "publishDir=$publishDir" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Setup dotnet
         uses: actions/setup-dotnet@v4
@@ -220,7 +224,7 @@ jobs:
 
       - name: Publish
         working-directory: ./src
-        run: dotnet publish **/$projectName.csproj --configuration $BuildConfiguration -p:PublishDir=./publish --self-contained false --no-restore
+        run: dotnet publish **/${{ env.projectName }}.csproj --configuration $BuildConfiguration -p:PublishDir=${{ env.publishDir }} --self-contained false --no-restore
 
         # Docker Build and Push
 
@@ -229,5 +233,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: package
-          path: $workflowDir/publish
+          path: ${{ env.publishDir }}/*.nupkg
             
