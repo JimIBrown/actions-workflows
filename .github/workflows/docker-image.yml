@@ -51,9 +51,12 @@ jobs:
           $publishDir = $workspaceDir + '/publish'
           New-Item -Path $workspaceDir -Name "publish" -ItemType "Directory"
 
+          $branch_name = $branch.substring($branch.LastIndexOf('/') + 1)
+
           Write-Host "Timestamp: $timestamp"
           Write-Host "BranchFull: $branchFull"
           Write-Host "Branch: $branch"
+          Write-Host "Branch Name: $branch_name"
           Write-Host "Build ID: $buildId"
           Write-Host "SHA: $hash"
           Write-Host "Short SHA: $short_hash"
@@ -91,6 +94,7 @@ jobs:
               $dockerLatestTag = "dev-latest"
           } elseif ($branch.StartsWith('feature/')) {
               write-host "Source Branch: feature"
+              $branch_name = $branch.replace('feature/','')
               $versionSuffix = "alpha-" + $branch_name
               $branchType = 'feature-' + $branch_name
               $build_config = 'Debug'
@@ -175,6 +179,7 @@ jobs:
           echo "DockerLatestTag=$dockerLatestTag" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "publishDir=$publishDir" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
 
+          echo "branch_name=$branch_name" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "buildId=$buildId" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "branchType=$branchType" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "version=$version" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
@@ -219,6 +224,7 @@ jobs:
           $jsonBase.Add("commit-hash", $env:GITHUB_WORKFLOW_SHA)
           $jsonBase.Add("short-hash", $env:SHORT_SHA)
           $jsonBase.Add("branch", $env:GITHUB_REF_NAME)
+          $jsonBase.Add("branch-name", $env:branch_name)
           $jsonBase.Add("branch-type", $env:branchType)
           $jsonBase.Add("build-config", $env:BuildConfiguration)
           $jsonBase.Add("build-timestamp", $env:timestamp)
@@ -235,7 +241,7 @@ jobs:
           $jsonBase | ConvertTo-Json | Out-File $versionFile
 
       - name: Docker Build and Push
-        if: ${{ env.BuildDockerImage }}
+        if: ${{ env.BuildDockerImage == 'true' }}
         run: |
           echo "Replace this step with docker build and push"
 
