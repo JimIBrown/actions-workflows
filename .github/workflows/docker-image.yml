@@ -178,8 +178,6 @@ jobs:
           echo "buildId=$buildId" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "branchType=$branchType" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "version=$version" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          echo "versionNumber=$json.version" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          echo "versionSuffix=$versionSuffix" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "timestamp=$timestamp" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Setup dotnet
@@ -217,8 +215,6 @@ jobs:
           $jsonBase = @{}
           $jsonBase.Add("build-id", $env:buildId)
           $jsonBase.Add("version", $env:version)
-          $jsonBase.Add("version-number", $env:versionNumber)
-          $jsonBase.Add("version-suffix", $env:versionSuffix)
           $jsonBase.Add("repo", $env:GITHUB_REPOSITORY)
           $jsonBase.Add("commit-hash", $env:GITHUB_WORKFLOW_SHA)
           $jsonBase.Add("short-hash", $env:SHORT_SHA)
@@ -230,8 +226,8 @@ jobs:
 
           if ($env:BuildDockerImage -eq "true") {
               $jsonBase.Add("docker-repo", $env:dockerRepo)
-              $jsonBase.Add("docker-tag", $env:dockerTag)
-              $jsonBase.Add("docker-latest-tag", $env:dockerLatestTag)
+              $jsonBase.Add("docker-tag", $env:DockerTag)
+              $jsonBase.Add("docker-latest-tag", $env:DockerLatestTag)
           }
 
           $versionFile = $env:publishDir + '/Version.json'
