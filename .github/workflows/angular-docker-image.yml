@@ -217,6 +217,7 @@ jobs:
           push: true
           tags: user/app:latest
           file: Dockerfile
+          context: ${{ github.workspace }}
 
       - name: Publish-Artifact
         if: ${{ github.event_name != 'pull_request' }}
