@@ -225,7 +225,7 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.REPOSITORY_OWNER }} --password-stdin
           docker build . -t ${{ inputs.dockerRepo }}:${{ env.DockerTag }}
-          docker push ghcr.io/${{ github.REPOSITORY_OWNER }}/${{ inputs.dockerRepo }}:${{ env.DockerTag }}
+          docker push ghcr.io/${{ inputs.dockerRepo }}:${{ env.DockerTag }}
 
       - name: Publish-Artifact
         if: ${{ github.event_name != 'pull_request' }}
