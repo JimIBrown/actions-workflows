@@ -223,5 +223,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: package
-          path: ${{ github.workspace }}
+          path: |
+            ${{ github.workspace }}/dist/
+            ${{ github.workspace }}/appversion.json
+            ${{ github.workspace }}/Version.json
             
