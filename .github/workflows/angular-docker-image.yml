@@ -200,13 +200,13 @@ jobs:
       - name: Test
         run: npm run test-headless
 
-      # - name: Docker Login
-      #   if: ${{ env.BuildDockerImage == 'true' }}
-      #   uses: docker/login-action@v2
-      #   with:
-      #     registry: ghcr.io
-      #     username: ${{ github.REPOSITORY_OWNER }}
-      #     password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker Login
+        if: ${{ env.BuildDockerImage == 'true' }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.REPOSITORY_OWNER }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # - name: Set up Docker Buildx
       #   if: ${{ env.BuildDockerImage == 'true' }}
@@ -222,10 +222,9 @@ jobs:
       #     context: ${{ github.workspace }}
 
 
-      - name: Docker Login
+      - name: Docker Build and Push
         if: ${{ env.BuildDockerImage == 'true' }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.REPOSITORY_OWNER }} --password-stdin
           docker build . -t ${{ inputs.dockerRepo }}:${{ env.DockerTag }}
           docker push ${{ inputs.dockerRepo }}:${{ env.DockerTag }}
 
