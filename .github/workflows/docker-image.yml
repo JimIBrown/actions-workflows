@@ -94,7 +94,6 @@ jobs:
               $dockerLatestTag = "dev-latest"
           } elseif ($branch.StartsWith('feature/')) {
               write-host "Source Branch: feature"
-              $branch_name = $branch.replace('feature/','')
               $versionSuffix = "alpha-" + $branch_name
               $branchType = 'feature-' + $branch_name
               $build_config = 'Debug'

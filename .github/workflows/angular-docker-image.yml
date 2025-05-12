@@ -1,0 +1,213 @@
+name: angular-docker-image
+
+on:
+    workflow_call:
+        inputs:
+            dockerRepo:
+              required: true
+              type: string
+
+jobs:
+  build-docker-image:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      KENDO_UI_LICENSE: ${{ secrets.KENDO_UI_LICENSE }}
+      NODE_OPTIONS: --max_old_space_size=4144
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v2
+      - name: set variables
+        run: |
+          shortSha=$(git rev-parse --short ${{ github.sha }})
+          echo "SHORT_SHA=$shortSha" >> $GITHUB_ENV
+          echo "dockerRepo=${{ inputs.dockerRepo }}" >> $GITHUB_ENV
+    
+      - name: versioning
+        shell: pwsh
+        run: |
+
+          $timestamp = Get-Date -Format o | ForEach-Object { $_ -replace ":", "." }
+
+          #Get Version
+          $packageJson = (Get-Content 'package.json' -Raw) | ConvertFrom-Json
+          $packageVersion = $packageJson.version
+          $packageName = $packageJson.name
+
+          write-host "PackageDir: " $env:npmrcDir
+          write-host "PackageVersion: " $packageVersion
+          write-host "PackageName: "$packageName
+
+          if ( [string]::IsNullOrEmpty($packageVersion) -or [string]::IsNullOrEmpty($packageName)) {
+              throw "Package name or version not found in Package.Json"
+          }
+
+          $dockerRepo = $env:dockerRepo
+          $short_hash = $env:SHORT_SHA
+          $hash = $env:GITHUB_WORKFLOW_SHA
+          $branchFull = $env:GITHUB_REF
+          $branch = $env:GITHUB_REF_NAME
+          $buildId = $env:GITHUB_RUN_NUMBER
+          $repo = $env:GITHUB_REPOSITORY
+          $repoOwner = $env:GITHUB_REPOSITORY_OWNER
+          $buildReason = $env:GITHUB_EVENT_NAME
+          $workspaceDir = $env:GITHUB_WORKSPACE
+
+          $branch_name = $branch.substring($branch.LastIndexOf('/') + 1)
+
+          Write-Host "Timestamp: $timestamp"
+          Write-Host "BranchFull: $branchFull"
+          Write-Host "Branch: $branch"
+          Write-Host "Branch Name: $branch_name"
+          Write-Host "Build ID: $buildId"
+          Write-Host "SHA: $hash"
+          Write-Host "Short SHA: $short_hash"
+          Write-Host "Build Reason: $buildReason"
+          Write-Host "Repo: $repo"
+          Write-Host "Repo Owner: $repoOwner"
+          Write-Host "Docker Repo: $dockerRepo"
+          Write-Host "Workspace Dir: $workspaceDir"
+          Write-Host "Publish Dir: $publishDir"
+        
+          $buildDockerImage = "true"
+          $dockerTag = ""
+          $dockerLatestTag = ""
+
+          if ($buildReason -eq 'pull_request') {
+              write-host "Source Branch: pull request"
+              $versionSuffix = ""
+              $branchType = 'pr'
+              $build_config = 'Release'
+              $buildDockerImage = "false"
+          } elseif ($branch -eq 'main') {
+              write-host "Source Branch: main"
+              $versionSuffix = ""
+              $branchType = 'main'
+              $build_config = 'Release'
+              $dockerTag = "prod-" + $buildId
+              $dockerLatestTag = "prod-latest"
+          } elseif ($branch -eq 'develop') {
+              write-host "Source Branch: develop"
+              $versionSuffix = "beta"
+              $branchType = 'develop'
+              $build_config = 'Release'
+              $dockerTag = "dev-" + $buildId
+              $dockerLatestTag = "dev-latest"
+          } elseif ($branch.StartsWith('feature/')) {
+              write-host "Source Branch: feature"
+              $versionSuffix = "alpha-" + $branch_name
+              $branchType = 'feature-' + $branch_name
+              $build_config = 'Debug'
+              $buildDockerImage = "false"
+          } elseif ($branch.StartsWith('hotfix/')) {
+            write-host "Source Branch: hotfix"
+              $versionSuffix = "hotfix"
+              $branchType = 'hotfix-' + $branch_name
+              $build_config = 'Release'
+              $dockerTag = "release-" + $buildId
+              $dockerLatestTag = "release-latest"
+          } elseif ($branch.StartsWith('release/')) {
+              write-host "Source Branch: release"
+              $versionSuffix = "rc"
+              $branchType = 'release-' + $branch_name
+              $build_config = 'Release'
+              $dockerTag = "release-" + $buildId
+              $dockerLatestTag = "release-latest"
+          } elseif ($branch.StartsWith('support/')) {
+              write-host "Source Branch: support"
+              $versionSuffix = ""
+              $branchType = 'support-' + $branch_name
+              $build_config = 'Release'
+              $dockerTag = "prod-" + $buildId
+              $dockerLatestTag = "prod-latest"
+          } else {
+              throw "Unrecognised Branch: " + $branch
+          }
+
+          if ($versionSuffix.Length -gt 0) {
+              $versionSuffixDashed = '-' + $versionSuffix
+          }
+
+          $version = $packageVersion + $versionSuffixDashed + '-' + $short_hash
+          write-host "Version: " $version
+          write-host "Config: $build_config"
+          write-host "buildDockerImage: $buildDockerImage"
+          write-host "dockerRepo: $dockerRepo"
+          write-host "dockerTag: $dockerTag"
+          write-host "dockerLatestTag: $dockerLatestTag"
+
+          #Update version
+          npm version $version --no-git-tag-version
+
+          #Write Version Files
+          $jsonBase = @{}
+          $jsonBase.Add("version", $version)
+
+          $versionInfoFile = $workspaceDir + '/appversion.json'
+          $jsonBase | ConvertTo-Json | Out-File $versionInfoFile
+
+          $jsonBase.Add("build-id", $buildId)
+          $jsonBase.Add("version-number", $packageVersion)
+          $jsonBase.Add("version-suffix", $versionSuffix)
+          $jsonBase.Add("repo", $repo)
+          $jsonBase.Add("commit-hash", $hash)
+          $jsonBase.Add("short-hash", $short_hash)
+          $jsonBase.Add("branch", $branch)
+          $jsonBase.Add("branch-name", $branch_name)
+          $jsonBase.Add("branch-type", $branchType)
+          $jsonBase.Add("build-config", $build_config)
+          $jsonBase.Add("build-timestamp",$timestamp)
+
+          if ($buildDockerImage -eq "true") {
+              $jsonBase.Add("docker-repo", $dockerRepo)
+              $jsonBase.Add("docker-tag", $dockerTag)
+              $jsonBase.Add("docker-latest-tag", $dockerLatestTag)
+          }
+
+          $versionFile = $workspaceDir + '/Version.json'
+          $jsonBase | ConvertTo-Json | Out-File $versionFile
+          
+
+          # Write variables
+          echo "BuildConfiguration=$build_config" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          echo "BuildDockerImage=$buildDockerImage" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          echo "DockerTag=$dockerTag" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          echo "DockerLatestTag=$dockerLatestTag" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.16.0
+
+      - name: Install Angular CLI
+        run: npm install -g @angular/cli@18.2.12
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        if: ${{ env.BuildConfiguration != 'Release' }}
+        run : npm run build
+
+      - name: Build Prod
+        if: ${{ env.BuildConfiguration == 'Release' }}
+        run: npm run build_prod
+
+      - name: Test
+        run: npm run test-headless
+
+      - name: Docker Build and Push
+        if: ${{ env.BuildDockerImage == 'true' }}
+        run: |
+          echo "Replace this step with docker build and push"
+
+      - name: Publish-Artifact
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: ${{ env.publishDir }}
+            
