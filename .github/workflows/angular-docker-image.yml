@@ -10,8 +10,6 @@ on:
 jobs:
   build-docker-image:
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       KENDO_UI_LICENSE: ${{ secrets.KENDO_UI_LICENSE }}
