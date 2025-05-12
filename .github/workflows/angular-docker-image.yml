@@ -224,7 +224,7 @@ jobs:
         if: ${{ env.BuildDockerImage == 'true' }}
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.REPOSITORY_OWNER }} --password-stdin
-          docker build -f Dockerfile -t ${{ inputs.dockerRepo }}:${{ env.DockerTag }}
+          docker build . -t ${{ inputs.dockerRepo }}:${{ env.DockerTag }}
           docker push ghcr.io/${{ github.REPOSITORY_OWNER }}/${{ inputs.dockerRepo }}:${{ env.DockerTag }}
 
       - name: Publish-Artifact
